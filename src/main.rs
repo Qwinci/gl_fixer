@@ -1,15 +1,21 @@
-use std::{fs::{read_to_string, write}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    fs::{read_to_string, write},
+};
 
 use regex::Regex;
 
 #[derive(Debug)]
 struct Pfn {
     ret_type: String,
-    args: String
+    args: String,
 }
 impl Pfn {
     fn new(ret_type: &str, args: &str) -> Pfn {
-        Pfn {ret_type: ret_type.to_owned(), args: args.to_owned()}
+        Pfn {
+            ret_type: ret_type.to_owned(),
+            args: args.to_owned(),
+        }
     }
 }
 
@@ -24,33 +30,52 @@ fn main() {
     for line in source.lines() {
         match regex.captures(line) {
             Some(captures) => {
-                pfns.insert(captures.get(2).unwrap().as_str(), Pfn::new(
-                captures.get(1).unwrap().as_str(),
-                captures.get(3).unwrap().as_str()));
-            },
-            None => {},
+                pfns.insert(
+                    captures.get(2).unwrap().as_str(),
+                    Pfn::new(
+                        captures.get(1).unwrap().as_str(),
+                        captures.get(3).unwrap().as_str(),
+                    ),
+                );
+            }
+            None => {}
         };
 
         match api_regex.captures(line) {
             Some(captures) => {
-                pfn_glad_map.insert(captures.get(2).unwrap().as_str(), captures.get(1).unwrap().as_str());
-            },
-            None => {},
+                pfn_glad_map.insert(
+                    captures.get(2).unwrap().as_str(),
+                    captures.get(1).unwrap().as_str(),
+                );
+            }
+            None => {}
         };
 
         match def_regex.captures(line) {
             Some(captures) => {
-                glad_gl_map.insert(captures.get(2).unwrap().as_str(), captures.get(1).unwrap().as_str());
-            },
-            None => {},
+                glad_gl_map.insert(
+                    captures.get(2).unwrap().as_str(),
+                    captures.get(1).unwrap().as_str(),
+                );
+            }
+            None => {}
         };
     }
 
     let mut output = String::from("#include \"glad/gl.h\"\n\n");
     for (glad_fn, gl_fn) in glad_gl_map.iter() {
-        let pfn_name = pfn_glad_map.get(glad_fn).expect(format!("glad function is missing for {}", gl_fn).as_str());
-        let pfn = pfns.get(pfn_name).expect(format!("pfn is missing for {}", glad_fn).as_str());
-        let args: Vec<&str> = pfn.args.split(&[',']).map(|f| f.trim().split_whitespace().last().unwrap_or_default()).filter(|f| f != &"void").collect();
+        let pfn_name = pfn_glad_map
+            .get(glad_fn)
+            .expect(format!("glad function is missing for {}", gl_fn).as_str());
+        let pfn = pfns
+            .get(pfn_name)
+            .expect(format!("pfn is missing for {}", glad_fn).as_str());
+        let args: Vec<&str> = pfn
+            .args
+            .split(&[','])
+            .map(|f| f.trim().split_whitespace().last().unwrap_or_default())
+            .filter(|f| f != &"void")
+            .collect();
         output += format!("#undef {}\n", gl_fn).as_str();
         output += format!("inline {} {}({}) {{\n", pfn.ret_type, gl_fn, pfn.args).as_str();
         output += format!("\treturn {}({});\n", glad_fn, args.join(", ")).as_str();
